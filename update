@@ -1,0 +1,209 @@
+#!/usr/bin/env bash
+
+void_packages="$HOME/void-packages"
+
+generic_log() {
+	printf "[1m[%s%s[38;5;15m] [%s] %s%s[m\n" \
+		"$1" "$2" "$(date +"%a %b %d %T %Z %Y")" "$1" "$3" >&2
+}
+
+crit() {
+	generic_log "[31m" "CRIT" "$1"
+}
+
+info() {
+	generic_log "[32m" "INFO" "$1"
+}
+
+warn() {
+	generic_log "[33m" "WARN" "$1"
+}
+
+die() {
+	(($# > 0)) && crit "$*"
+	exit 1
+}
+
+find_package_files() {
+	find "$void_packages/hostdir/binpkgs" -type f -regextype egrep -regex \
+		"^$void_packages/hostdir/binpkgs.*\/$1-[^-]+_[^_]+\.[^.]+\.xbps"
+}
+
+delete_package_from_local_repo() {
+	warn "Deleting $1"
+	while read -r file; do
+		[ -z "$file" ] && break
+		rm "$file"
+	done <<< "$(find_package_files "$1")"
+}
+
+get_installed_package_version() {
+	file="$(basename "$(find_package_files "$1" | sed 1q)")"
+	echo "${file%.*.xbps}"
+}
+
+get_available_package_version() {
+	local version revision
+	version="$(
+		grep "^version=" "$void_packages/srcpkgs/$1/template" \
+		| sed "s|^version=||"
+	)"
+	revision="$(
+		grep "^revision=" "$void_packages/srcpkgs/$1/template" \
+		| sed "s|^revision=||"
+	)"
+	printf "%s-%s_%s" "$1" "$version" "$revision"
+}
+
+check_package_for_update() {
+	local installed available
+	installed="$(get_installed_package_version "$1")"
+	available="$(get_available_package_version "$1")"
+
+	# check if the package is no longer available
+	[ "$available" == "$1-_" ] && {
+		delete_package_from_local_repo "$1"
+		return
+	}
+
+	echo "$installed -> $available" >&2
+	[ "$installed" == "$available" ] && return
+	echo "$1"
+}
+
+enable_package_override() {
+	name="$(basename "$1")"
+	orig="$void_packages/srcpkgs/$name"
+
+	[ -e "$orig" ] && [ ! -L "$orig" ] && {
+		if [ -d "$orig" ]; then
+			mv -v "$orig" "$HOME/tmp/"
+		else
+			die "Unexpected file $orig (not a symlink or folder)"
+		fi
+	}
+
+	ln -sf "$1" "$orig"
+}
+
+disable_package_override() {
+	file="$void_packages/srcpkgs/$1"
+	if [ ! -e "$file" ]; then
+		warn "Expected $file, but it does not exist"
+	elif [ -L "$file" ]; then
+		unlink "$file"
+	elif [ -d "$file" ]; then
+		warn "Override for $1 already disabled"
+	else
+		die "Unexpected file $file (not a symlink or folder)"
+	fi
+
+	[ -d "$HOME/tmp/$1" ] \
+	&& mv -v "$HOME/tmp/$1" "$file"
+}
+
+exitfunc() {
+	umount "$void_packages/srcpkgs"
+	rmdir "$void_packages/srcpkgs"
+	mv "$void_packages/.srcpkgs" "$void_packages/srcpkgs"
+	[ -f "$updates" ] && rm "$updates"
+}
+
+[ "$USER" != "vosoma" ] && {
+	crit "Incorrect user"
+	cat << EOF
+Please create the vosoma system user and run this script as that user.
+Possible commands (they require root privileges):
+# useradd -d /var/cache/vosoma -m -r -s /bin/nologin -U vosoma
+# chmod 755 /var/cache/vosoma
+# su - vosoma -s /bin/sh -c $0
+You could add this script to vosoma's crontab for automatic updates:
+# crontab -u vosoma -e
+@reboot vosoma
+EOF
+die
+}
+
+xbps-query "mergerfs" >/dev/null || [ -f "$HOME/no_package_overrides" ] || {
+	crit "mergerfs not installed, but required for package overrides"
+	crit "Create $HOME/no_package_overrides to disable overrides"
+	die
+}
+
+cd "$HOME" || die
+mkdir -p "$void_packages" || die "Could not create $void_packages"
+
+[ -d "$void_packages/.git" ] \
+|| git clone --depth=1 "git://github.com/void-linux/void-packages" "$void_packages" \
+|| die "Could not download void-packages"
+
+[ -d "$void_packages/hostdir/binpkgs" ] \
+|| ./xbps-src binary-bootstrap \
+|| die "Could not bootstrap environment"
+
+info "Checking network"
+while true; do
+	ping -c 1 github.com && break
+	sleep 1
+done
+
+info "Downloading updates for official sources"
+cd "$void_packages" || die
+git pull
+cd "$HOME" || die
+
+info "Creating target list"
+if [ -e "$HOME/targets" ] && [ ! -d "$HOME/targets" ]; then
+	true
+else
+	touch "$OME/targets" \
+	|| die "Could not create empty $HOME/targets"
+	die "No targets in $HOME/targets"
+fi
+
+if [ -f "$HOME/no_package_overrides" ]; then
+	warn "Package overrides disabled"
+	warn "Remove $HOME/no_package_overrides and install mergerfs to enable them"
+else
+	info "Enabling package overrides"
+	trap 'exitfunc' EXIT
+	order="$(
+		sed -E "
+			s|^(.)|$HOME/\1|;
+			s|void-packages/srcpkgs|void-packages/.srcpkgs|
+		" "$HOME/order" \
+		| tr "\n" ":" \
+		| head -c-1
+	)" \
+	|| die "Could not read override order from $HOME/order"
+	cmd="mergerfs -o ro $order $void_packages/srcpkgs"
+	mv "$void_packages/srcpkgs" "$void_packages/.srcpkgs"
+	mkdir "$void_packages/srcpkgs"
+	export GIT_DISCOVERY_ACROSS_FILESYSTEM=1
+	eval "$cmd" || die "Could not create override mount"
+fi
+
+info "Creating update list"
+cd "$void_packages" || die
+updates="$(mktemp)"
+while read -r pkg; do
+	[ -z "$pkg" ] && break
+	check_package_for_update "$pkg" &
+done < "$HOME/targets" >> "$updates"
+wait
+
+while read -r pkg; do
+	[ -z "$pkg" ] && break
+	index_changed="true"
+	delete_package_from_local_repo "$pkg"
+	info "Building $pkg"
+	./xbps-src pkg "$pkg"
+done < "$updates"
+
+[ "$index_changed" == "true" ] || exit
+info "Regenerating package index"
+while read -r dir; do
+	[ -z "$dir" ] && break
+	xbps-rindex -C -c "$dir"
+	xbps-rindex -C -a "$dir"/*.xbps
+done <<< "$(find "$void_packages/hostdir/binpkgs" -type d)"
