@@ -71,42 +71,19 @@ check_package_for_update() {
 	echo "$1"
 }
 
-enable_package_override() {
-	name="$(basename "$1")"
-	orig="$void_packages/srcpkgs/$name"
-
-	[ -e "$orig" ] && [ ! -L "$orig" ] && {
-		if [ -d "$orig" ]; then
-			mv -v "$orig" "$HOME/tmp/"
-		else
-			die "Unexpected file $orig (not a symlink or folder)"
-		fi
-	}
-
-	ln -sf "$1" "$orig"
-}
-
-disable_package_override() {
-	file="$void_packages/srcpkgs/$1"
-	if [ ! -e "$file" ]; then
-		warn "Expected $file, but it does not exist"
-	elif [ -L "$file" ]; then
-		unlink "$file"
-	elif [ -d "$file" ]; then
-		warn "Override for $1 already disabled"
-	else
-		die "Unexpected file $file (not a symlink or folder)"
-	fi
-
-	[ -d "$HOME/tmp/$1" ] \
-	&& mv -v "$HOME/tmp/$1" "$file"
-}
-
 exitfunc() {
 	umount "$void_packages/srcpkgs"
 	rmdir "$void_packages/srcpkgs"
 	mv "$void_packages/.srcpkgs" "$void_packages/srcpkgs"
 	[ -f "$updates" ] && rm "$updates"
+}
+
+read_or_exec() {
+	if [ -x "$1" ]; then
+		"$1"
+	else
+		cat "$1"
+	fi
 }
 
 [ "$USER" != "vosoma" ] && {
@@ -132,6 +109,7 @@ xbps-query "mergerfs" >/dev/null || [ -f "$HOME/no_package_overrides" ] || {
 
 cd "$HOME" || die
 mkdir -p "$void_packages" || die "Could not create $void_packages"
+cd "$void_packages" || die
 
 [ -d "$void_packages/.git" ] \
 || git clone --depth=1 "git://github.com/void-linux/void-packages" "$void_packages" \
@@ -147,18 +125,18 @@ while true; do
 	sleep 1
 done
 
-info "Downloading updates for official sources"
-cd "$void_packages" || die
-git pull
-cd "$HOME" || die
+while read -r repo; do
+	[ -z "$repo" ] && break
+	cd "$HOME/$repo" || die "Repository $HOME/$repo not found"
+	info "Updating $repo"
+	git pull || warn "git pull failed for repo $repo"
+done <<< "$(read_or_exec "$HOME/order")"
 
-info "Creating target list"
-if [ -e "$HOME/targets" ] && [ ! -d "$HOME/targets" ]; then
-	true
-else
-	touch "$OME/targets" \
-	|| die "Could not create empty $HOME/targets"
-	die "No targets in $HOME/targets"
+if [ ! -e "$HOME/targets" ]; then
+	info "Creating empty target list"
+	touch "$HOME/targets" || die "Could not create $HOME/targets"
+elif [ -d "$HOME/targets" ]; then
+	die "Target list $HOME/targets must not be a folder"
 fi
 
 if [ -f "$HOME/no_package_overrides" ]; then
@@ -168,10 +146,11 @@ else
 	info "Enabling package overrides"
 	trap 'exitfunc' EXIT
 	order="$(
-		sed -E "
+		read_or_exec "$HOME/order" \
+		| sed -E "
 			s|^(.)|$HOME/\1|;
 			s|void-packages/srcpkgs|void-packages/.srcpkgs|
-		" "$HOME/order" \
+		" \
 		| tr "\n" ":" \
 		| head -c-1
 	)" \
@@ -189,7 +168,7 @@ updates="$(mktemp)"
 while read -r pkg; do
 	[ -z "$pkg" ] && break
 	check_package_for_update "$pkg" &
-done < "$HOME/targets" >> "$updates"
+done <<< "$(read_or_exec "$HOME/targets")" >> "$updates"
 wait
 
 while read -r pkg; do
