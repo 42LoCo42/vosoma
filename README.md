@@ -81,7 +81,9 @@ vosoma ~ $ tree $HOME/repos/
 
 4 directories, 5 files
 ```
-`foo` is a repository containing a single package, `thing`, which will be available as a target.
+`local` is a repository containing a single package, `onlyoffice-bin`,
+which will be available as a target.
+Also, this repo is added, therefore the target `vosoma` will be available.
 
 Specify the order of overrides in `$HOME/order`. When a package exists in multiple repositories,
 the first one listed in this file will be used to build the package.
