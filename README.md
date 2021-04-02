@@ -35,7 +35,7 @@ username ~/vosoma $ sudo cp update /var/cache/vosoma
 username ~/vosoma $ sudo su - vosoma -s /bin/sh
 vosoma ~ $ ./update
 ```
-5. (OPTIONAL) (**WIP - DON'T DO THIS YET!!!**) Enable automatic updates for `vosoma`
+5. (OPTIONAL) Enable automatic updates for `vosoma`
 ```bash
 vosoma ~ $ git clone git://github.com/42LoCo42/vosoma repos/vosoma
 vosoma ~ $ echo repos/vosoma >> order
@@ -57,22 +57,29 @@ This is usually `/var/cache/vosoma`
 List all packages that should be built by `vosoma` in `$HOME/targets`.
 Example:
 ```bash
-$ cat $HOME/targets
-linux5.11
-wine
+vosoma ~ $ cat $HOME/targets
+font-symbola
 discord
+onlyoffice-bin
+vosoma
 ```
 
 Add package overrides (folders like srcpkgs containing packages) in `$HOME/repos`.
 Example:
 ```bash
-$ tree $HOME/repos
-/var/cache/vosoma/repos
-└── foo
-    └── thing
+vosoma ~ $ tree $HOME/repos/
+/var/cache/vosoma/repos/
+├── local
+│   └── onlyoffice-bin
+│       └── template
+└── vosoma
+    ├── LICENSE
+    ├── README.md
+    ├── update
+    └── vosoma
         └── template
 
-2 directories, 1 file
+4 directories, 5 files
 ```
 `foo` is a repository containing a single package, `thing`, which will be available as a target.
 
@@ -80,9 +87,10 @@ Specify the order of overrides in `$HOME/order`. When a package exists in multip
 the first one listed in this file will be used to build the package.
 Example:
 ```bash
-$ cat $HOME/order
-repos/foo
+vosoma ~ $ cat order
+repos/local
 void-packages/srcpkgs
+repos/vosoma
 ```
 
 ## Coming soon
