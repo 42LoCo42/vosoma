@@ -13,7 +13,42 @@ Additionally, it supports ordered package overrides
 in the style of [kisslinux][] using [mergerfs][].
 
 ## Installation
-WIP
+Convention: the shell prompt is `<username> <work directory> $`  
+This means that you must only copy the commands beginning after the $ character.
+1. Clone this repo
+```bash
+username ~ $ git clone git://github.com/42LoCo42/vosoma
+username ~ $ cd vosoma
+```
+2. Install dependencies
+```bash
+username ~/vosoma $ sudo xbps-install git mergerfs
+```
+3. Create the `vosoma` user and set up its home directory
+```bash
+username ~/vosoma $ sudo useradd -d /var/cache/vosoma -m -r -s /bin/nologin -U vosoma
+username ~/vosoma $ sudo chmod 755 /var/cache/vosoma
+username ~/vosoma $ sudo cp update /var/cache/vosoma
+```
+4. Change to `vosoma` and initialize the local [void-packages][] installation
+```bash
+username ~/vosoma $ sudo su - vosoma -s /bin/sh
+vosoma ~ $ ./update
+```
+5. (OPTIONAL) (**WIP - DON'T DO THIS YET!!!**) Enable automatic updates for `vosoma`
+```bash
+vosoma ~ $ git clone git://github.com/42LoCo42/vosoma repos/vosoma
+vosoma ~ $ echo repos/vosoma >> order
+vosoma ~ $ echo vosoma >> targets
+```
+6. For automatic updates, install a cron daemon (like [cronie][])
+    and add `@reboot $HOME/vosoma` to `vosoma`'s crontab
+```bash
+vosoma ~ $ exit
+username ~/vosoma $ sudo xbps-install cronie
+username ~/vosoma $ sudo ln -s /etc/sv/crond /var/service
+username ~/vosoma $ echo '@reboot $HOME/update' | sudo tee /var/spool/cron/vosoma
+```
 
 ## Usage
 Convention: `$HOME` signifies the home directory of the `vosoma` user.
@@ -50,9 +85,6 @@ repos/foo
 void-packages/srcpkgs
 ```
 
-To run the update script on each boot, install a cron daemon and do `sudo crontab -u vosoma -e`,
-then add the entry `@reboot $HOME/update`
-
 ## Coming soon
 - Build options for targets
 - A handful of tools allowing easier management of targets, repos and their order
@@ -63,3 +95,4 @@ then add the entry `@reboot $HOME/update`
 [void-packages]: https://github.com/void-linux/void-packages
 [mergerfs]: https://github.com/trapexit/mergerfs
 [kisslinux]: https://github.com/kisslinux
+[cronie]: https://github.com/cronie-crond/cronie
