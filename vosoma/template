@@ -22,5 +22,5 @@ do_extract() {
 do_install() {
 	install -Dm755 \
 		"$XBPS_SRCDISTDIR/$pkgname-$version/update" \
-		"$DESTDIR/var/cache/$pkgname/"
+		"$DESTDIR/var/cache/$pkgname/update"
 }
