@@ -1,0 +1,25 @@
+# Template file for 'vosoma'
+pkgname=vosoma
+version=1.1
+revision=1
+depends="git mergerfs"
+short_desc="Void Sources Manager"
+maintainer="Leon Schumacher <leonsch@protonmail.com>"
+license="GPL-3.0-or-later"
+homepage="https://github.com/42LoCo42/vosoma"
+
+distfiles="https://raw.githubusercontent.com/42LoCo42/vosoma/master/update"
+checksum=80bfbc2bc4a06f7f0cc4b2f607edb5b1d19b803ce6aa09273f22719aee93a17c
+
+system_accounts="vosoma"
+vosoma_homedirs="/var/cache/vosoma"
+make_dirs="/var/cache/vosoma 0755 vosoma vosoma"
+
+do_extract() {
+	true
+}
+
+do_install() {
+	mkdir -p "$DESTDIR/var/cache/$pkgname"
+	cp "$XBPS_SRCDISTDIR/$pkgname-$version/update" "$DESTDIR/var/cache/$pkgname/"
+}
