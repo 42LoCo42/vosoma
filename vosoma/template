@@ -1,7 +1,7 @@
 # Template file for 'vosoma'
 pkgname=vosoma
-version=1.1
-revision=2
+version=1.2
+revision=1
 depends="git mergerfs"
 short_desc="Void Sources Manager"
 maintainer="Leon Schumacher <leonsch@protonmail.com>"
@@ -9,7 +9,7 @@ license="GPL-3.0-or-later"
 homepage="https://github.com/42LoCo42/vosoma"
 
 distfiles="https://raw.githubusercontent.com/42LoCo42/vosoma/master/update"
-checksum=80bfbc2bc4a06f7f0cc4b2f607edb5b1d19b803ce6aa09273f22719aee93a17c
+checksum=dd7f0a5e136c3f235f8900c86371b6928bfca35260b7776e5e4db09c465ab8a9
 
 system_accounts="vosoma"
 vosoma_homedirs="/var/cache/vosoma"

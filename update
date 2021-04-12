@@ -173,13 +173,11 @@ wait
 
 while read -r pkg; do
 	[ -z "$pkg" ] && break
-	index_changed="true"
 	delete_package_from_local_repo "$pkg"
 	info "Building $pkg"
 	./xbps-src pkg "$pkg"
 done < "$updates"
 
-[ "$index_changed" == "true" ] || exit
 info "Regenerating package index"
 while read -r dir; do
 	[ -z "$dir" ] && break
