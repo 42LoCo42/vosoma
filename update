@@ -139,6 +139,13 @@ elif [ -d "$HOME/targets" ]; then
 	die "Target list $HOME/targets must not be a folder"
 fi
 
+if [ ! -e "$HOME/order" ]; then
+	info "Creating default order list"
+	echo "void-packages/srcpkgs" > "$HOME/order"
+elif [ -d "$HOME/order" ]; then
+	die "Order list $HOME/order must not be a folder"
+fi
+
 if [ -f "$HOME/no_package_overrides" ]; then
 	warn "Package overrides disabled"
 	warn "Remove $HOME/no_package_overrides and install mergerfs to enable them"
