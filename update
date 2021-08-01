@@ -121,6 +121,7 @@ cd "$void_packages" || die
 
 info "Checking network"
 while true; do
+	rfkill | grep wlan | grep "\sblocked" && die "WLAN disabled"
 	ping -c 1 github.com && break
 	sleep 1
 done
